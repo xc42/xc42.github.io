@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="utf-8">
+  
+
+  
+  <title>机器的机器（零）--如何用C++实现一个Lisp解释器 | (lambda inside)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="前言编译器（解释器）作为程序员的“四大浪漫”之一，自我学了编译原理以来就一直想要实现一门自己的编程语言， 尝试过几次但是都因为种种原因半途而废。直到我看了SICP（中文译名《计算机程序的构造与解释》）。  这是一本很经典的“神书”，但似乎知名度似乎不如《深入计算机系统》、《算法导论》。虽然我不是第一次听说，但却是第一 次看，然后就上瘾了，这本书讲啥的的，我就不多说了，可以上网查，总之我强烈推荐。当">
+<meta name="keywords" content="解释器 函数式编程 Lisp Scheme C++ SICP">
+<meta property="og:type" content="article">
+<meta property="og:title" content="机器的机器（零）--如何用C++实现一个Lisp解释器">
+<meta property="og:url" content="https://xc42.github.io/2018/11/09/cpp-lisp-interpreter/index.html">
+<meta property="og:site_name" content="(lambda inside)">
+<meta property="og:description" content="前言编译器（解释器）作为程序员的“四大浪漫”之一，自我学了编译原理以来就一直想要实现一门自己的编程语言， 尝试过几次但是都因为种种原因半途而废。直到我看了SICP（中文译名《计算机程序的构造与解释》）。  这是一本很经典的“神书”，但似乎知名度似乎不如《深入计算机系统》、《算法导论》。虽然我不是第一次听说，但却是第一 次看，然后就上瘾了，这本书讲啥的的，我就不多说了，可以上网查，总之我强烈推荐。当">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="https://xc42.github.io/2018/11/09/cpp-lisp-interpreter/sicp.jpg">
+<meta property="og:image" content="https://xc42.github.io/2018/11/09/cpp-lisp-interpreter/ast.png">
+<meta property="og:image" content="https://xc42.github.io/2018/11/09/cpp-lisp-interpreter/fac-machine.png">
+<meta property="og:image" content="https://xc42.github.io/2018/11/09/cpp-lisp-interpreter/evaluator.png">
+<meta property="og:image" content="https://xc42.github.io/2018/11/09/cpp-lisp-interpreter/computation-xkcd.png">
+<meta property="og:image" content="https://xc42.github.io/2018/11/09/cpp-lisp-interpreter/lisp-xkcd.jpg">
+<meta property="og:image" content="https://xc42.github.io/2018/11/09/cpp-lisp-interpreter/toyLisp.png">
+<meta property="og:updated_time" content="2018-11-11T07:58:04.690Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="机器的机器（零）--如何用C++实现一个Lisp解释器">
+<meta name="twitter:description" content="前言编译器（解释器）作为程序员的“四大浪漫”之一，自我学了编译原理以来就一直想要实现一门自己的编程语言， 尝试过几次但是都因为种种原因半途而废。直到我看了SICP（中文译名《计算机程序的构造与解释》）。  这是一本很经典的“神书”，但似乎知名度似乎不如《深入计算机系统》、《算法导论》。虽然我不是第一次听说，但却是第一 次看，然后就上瘾了，这本书讲啥的的，我就不多说了，可以上网查，总之我强烈推荐。当">
+<meta name="twitter:image" content="https://xc42.github.io/2018/11/09/cpp-lisp-interpreter/sicp.jpg">
+  
+    <link rel="alternate" href="/atom.xml" title="(lambda inside)" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+</html>
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">(lambda inside)</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://xc42.github.io"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-cpp-lisp-interpreter" class="article article-type-post" itemscope="" itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2018/11/09/cpp-lisp-interpreter/" class="article-date">
+  <time datetime="2018-11-09T05:27:59.000Z" itemprop="datePublished">2018-11-09</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      机器的机器（零）--如何用C++实现一个Lisp解释器
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>编译器（解释器）作为程序员的“四大浪漫”之一，自我学了编译原理以来就一直想要实现一门自己的编程语言，
+尝试过几次但是都因为种种原因半途而废。直到我看了SICP（中文译名《计算机程序的构造与解释》）。
+<img src="/2018/11/09/cpp-lisp-interpreter/sicp.jpg">
+这是一本很经典的“神书”，但似乎知名度似乎不如《深入计算机系统》、《算法导论》。虽然我不是第一次听说，但却是第一
+次看，然后就上瘾了，这本书讲啥的的，我就不多说了，可以上网查，总之我强烈推荐。当我用C++写这个解释器的时候以及写
+这个博客的时候才刚把第四章第一节看完，书中这一节正好是教你写一个Scheme（Lisp的一门方言）的元循环求值器。但是
+元循环感觉不是很过瘾，因为用Scheme来写Scheme的解释器还是用了很多该语言自带的一些设施，所以打算用C++来实现一
+个Lisp解释器。虽说现在还没实现过自己的编程语言，但是第一次能实现现实中的语言也还是略有成就感的。而且在自己视野
+还不是很开阔的，见识的不够多的时候，写不出来个什么好的语言，一般就是个c-like的过程式……接触了Lisp确实涨见识
+了。当然，现在知道的也不多，近期计划是打算把SICP看完了后再看《Essentials of Programming Languages》，还
+包括一些语言像Haskell,Ocaml,以及各种虚拟机，编译技术，比如JVM,LLVM等。所以打算开个坑，作为我人生中的第一篇
+博客，写个系列，记录我学习程序语言理论、技术中学到的东西，这是系列的第0篇。</p>
+<h2 id="什么是解释器？"><a href="#什么是解释器？" class="headerlink" title="什么是解释器？"></a>什么是解释器？</h2><p>举个栗子，叫你写一个计算器程序，它的输入是一串四则表达式的字符串，比如“7+14*(6-3)”，输出的是该计算式的值。你
+写的那个计算器就是“四则表达式语言”的 <strong>解释器</strong>，在这个“语言”里，只有两种元素，数字和操作符，你读取这个字符串的时候
+就可以顺序地把它们分割出来，比如上述的表达式就分成{“7”,”+”,”14”,”*”,”(“…}，这个过程就叫tokenize,或者说
+词法分析，对应的程序叫tokenizer或lexer。然后这个token流的结构经过语法分析器(parser)通常转换成一颗抽象语法
+树(Abstract Syntax Tree)，这个树看起来像这样:</p>
+<img src="/2018/11/09/cpp-lisp-interpreter/ast.png">
+<p>你遍历这颗语法树，对每一颗子树求值，就最终计算出了结果，完成了解释。再举一个SICP书中的例子，一个计算阶乘的函数
+可以看做一台抽象的机器，那些条件，算术运算就像信号处理的节点，计算factorial(6)求值时就像下图这样:</p>
+<img src="/2018/11/09/cpp-lisp-interpreter/fac-machine.png">
+<p>而Lisp解释器就是以类似这样一台机器的描述（也就是Lisp代码）作为输入，如果我们用C++来写这个解释器就是用C++来模
+拟了用Lisp代码来描述的计算机器。而写的C++代码本身也同样是一台计算的机器，最后被C++编译器转换成机器语言，而机
+器语言得以执行是因为它有一个物理的解释器——CPU。</p>
+<img src="/2018/11/09/cpp-lisp-interpreter/evaluator.png">
+<p><em>一则有意思的xkcd漫画 XD</em>
+<img src="/2018/11/09/cpp-lisp-interpreter/computation-xkcd.png" title="元胞自动机"></p>
+<h2 id="Lisp入门"><a href="#Lisp入门" class="headerlink" title="Lisp入门"></a>Lisp入门</h2><p>上述的词法分析、语法分析在我们这实现的Lisp解释器里用的特别少，因为Lisp基本没有语法，而且它语言本身就是一个抽象
+语法树!我写的这个Lisp解释器里关于词法、语法分析
+的代码只有100行左右，做个比较，比如Python的C语言实现中词法分析就有一千多行。Lisp一门是函数式编程语言，这里的
+“函数式”的意思不要误解成C语言中那种把一个现实问题抽象成一系列过程，然后把一些子过程包装成函数（子过程）。在函数
+式编程语言中函数是“一等公民”，可以像其他语言的数值类型一样当做值传递，接受函数为参数的函数叫高阶函数，你可以方
+便的对函数进行计算，从函数里返回函数。这门比Ｃ语言还古老的高级程序语言，诞生于1958年（C语言是1969-1972)，发
+明人是约翰·麦卡锡（如果你上过《人工智能》这门课可能记得这名字），发明的目的是为了做符号推演研究人工智能
+（那时的研究方法不同于现在基于概率统计）。因为Lisp悠久的历史和简洁的语法，函数式的优雅，深受早期hacker
+的喜爱（如果你看过《黑客与画家》那应该还记得书中作者对Lisp的不吝笔墨的赞扬）同时也催生了一大堆基于它
+的方言，比如Scheme，Common Lisp, Racket……。</p>
+<img src="/2018/11/09/cpp-lisp-interpreter/lisp-xkcd.jpg" title="还有一些meme">
+<p>函数式编程源于lambda caculus(λ演算)，lambda caculus是一套 <strong>计算模型</strong>（还有各种各样的计算模型，比如：
+有限状态机，元胞自动机），就如同我们熟知的图灵机一样，只不过图灵机更倾向与物理上的表述，而lambda
+演算更抽象。但是只要图灵机能计算的，lambda演算也能计算。关于跟多关于lambda演算的科普可以参考文末的
+相关阅读，这里就不多说了(毕竟那些数学性的东西我也还没深入去看，现在还是入门水平XD)。</p>
+<p>接下来看看Lisp有多简单吧，不需要21天，只需要5分钟：</p>
+<blockquote>
+<p>所有的Lisp程序代码都写为S-表达式或以括号表示的列表。函数调用或语义形式也同样写成列表，首先是函数或操作符的名
+称，然后接着是一或多个参数：例如，取三个参数的函数f即为（f arg1 arg2 arg3）</p>
+</blockquote>
+<blockquote>
+<p>Lisp的表达式是一个原子（atom）
+或列表（list），原子又包含符号（symbol）与数值（number）；列表是由
+零个或多个表达式组成的序列，表达式之间用空格分隔开，放入一对括号中</p>
+</blockquote>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">x <span class="comment">;一个符号</span></span><br><span class="line"><span class="number">42</span> <span class="comment">;一个数字</span></span><br><span class="line">(<span class="name">x</span> <span class="number">42</span> <span class="number">0</span>) <span class="comment">;一个列表</span></span><br><span class="line">(<span class="number">1</span> <span class="number">2</span> (<span class="name">-1</span> (<span class="number">2</span> <span class="number">0</span>))) <span class="comment">;嵌套列表</span></span><br></pre></td></tr></table></figure>
+<p>然后有七个对表达式的基本操作符</p>
+<h3 id="1-quote"><a href="#1-quote" class="headerlink" title="1. quote"></a>1. quote</h3><figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">quote</span> x) <span class="comment">;语法糖形式为'x，函数直接返回x,即quote后面的表达式不会被计算，直接返回它的字面值</span></span><br><span class="line">(<span class="name">quote</span> (+ <span class="number">1</span> <span class="number">2</span>)) <span class="comment">;后面的表达式不会被计算直接，直接返回列表(+ 1 2)</span></span><br><span class="line"><span class="comment">;(+ 1 2)</span></span><br></pre></td></tr></table></figure>
+<h3 id="2-atom"><a href="#2-atom" class="headerlink" title="2. atom"></a>2. atom</h3><figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">atom</span> <span class="number">5</span>) <span class="comment">;atom测试表达式是否是原子类型，5是原子类型，返回true</span></span><br><span class="line">(<span class="name">atom</span> '(<span class="number">1</span> <span class="number">2</span> <span class="number">3</span>)) <span class="comment">;列表不是原子，返回false</span></span><br></pre></td></tr></table></figure>
+<h3 id="3-eq？"><a href="#3-eq？" class="headerlink" title="3. eq？"></a>3. eq？</h3><figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">eq</span>？ a b) <span class="comment">;测试a b是否指向同一对象</span></span><br></pre></td></tr></table></figure>
+<h3 id="4-cons"><a href="#4-cons" class="headerlink" title="4. cons"></a>4. cons</h3><figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">cons</span> <span class="number">1</span> <span class="number">2</span>) <span class="comment">;返回一个cons cell，以dotted pair显示， 是构造列表的基础设施，如同能存储两个数据</span></span><br><span class="line"><span class="comment">;(1 . 2)</span></span><br><span class="line">(<span class="name">cons</span> <span class="number">1</span> (<span class="name">cons</span> <span class="number">2</span> <span class="number">3</span>)) <span class="comment">;cons里的参数可以是任意表达式，比如(cons 2 3)</span></span><br><span class="line"><span class="comment">;(1 2 . 3)</span></span><br><span class="line">(<span class="name">cons</span> <span class="number">1</span> '()) <span class="comment">; 当cons第二个参数是一个（空）表,dot就会被省略，表示出来就是我们常见的表的形式</span></span><br><span class="line"><span class="comment">;(1)</span></span><br><span class="line">(<span class="name">cons</span> <span class="number">1</span> (<span class="name">cons</span> <span class="number">2</span> '())) <span class="comment">; (cons 2 '())返回一个表(2), (cons 1 '(2))返回(1 2)</span></span><br><span class="line"><span class="comment">;(1 2)</span></span><br><span class="line">(<span class="name">cons</span> <span class="number">1</span> (<span class="name">cons</span> <span class="number">2</span> (<span class="name">cons</span> <span class="number">3</span> '()))) <span class="comment">;可以一直嵌套下去</span></span><br><span class="line"><span class="comment">;(1 2 3)</span></span><br></pre></td></tr></table></figure>
+<h3 id="5-car"><a href="#5-car" class="headerlink" title="5. car"></a>5. car</h3><figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">car</span> '(<span class="number">1</span> <span class="number">2</span> <span class="number">3</span>)) <span class="comment">;取表的第一个元素， 返回1</span></span><br><span class="line">(<span class="name">car</span> (<span class="name">cons</span> <span class="number">4</span> <span class="number">5</span>)) <span class="comment">;返回4</span></span><br></pre></td></tr></table></figure>
+<h3 id="6-cdr"><a href="#6-cdr" class="headerlink" title="6. cdr"></a>6. cdr</h3><figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">cdr</span> '(<span class="number">1</span> <span class="number">2</span> <span class="number">3</span>)) <span class="comment">;取表除头外的剩余部分,返回(2 3)</span></span><br><span class="line"><span class="comment">;(2 3)</span></span><br><span class="line">(<span class="name">cdr</span> (<span class="name">cons</span> <span class="number">1</span> <span class="number">2</span>)) <span class="comment">;返回2</span></span><br><span class="line"><span class="comment">;2</span></span><br></pre></td></tr></table></figure>
+<h3 id="7-if"><a href="#7-if" class="headerlink" title="7. if"></a>7. if</h3><figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">if</span> cond conseqence alternative) <span class="comment">;简单，如果cond成立，那么返回conseqence的值，否则返回alternative</span></span><br></pre></td></tr></table></figure>
+<p>以上7个基本操作符中除了quote和if，其余都是函数。另外本文所实现的解释器其实更像Scheme的解释器，原初的Lisp我是
+没有去了解的，不过不影响我们学习;)。除此之外还有一个要点，就是定义函数。</p>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">lambda</span> (<span class="name">var1</span> var2) body)</span><br></pre></td></tr></table></figure>
+<p>这个lambda就是来自lambda演算中定义函数的符号，现在很多高级点的程序语言都从函数式语言中借鉴引入了lambda函数（匿
+名）函数的功能，比如Python,C++,Java,javascript,matlab都有。</p>
+<ul>
+<li>Python中的lambda函数长这样</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">lambda</span> x: x * x</span><br></pre></td></tr></table></figure>
+<ul>
+<li>C++中的lambda函数长这样</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line">[](<span class="keyword">int</span> x)&#123;<span class="keyword">return</span> x * x;&#125;</span><br></pre></td></tr></table></figure>
+<p>我们要调用一个函数，应用(apply)它到实际参数上就像我们之前说的，把函数放在表头，参数放在后头，比如要计算4的平方</p>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">((<span class="name">lambda</span> (<span class="name">x</span>) (<span class="name">*</span> x x)) <span class="number">4</span>)</span><br></pre></td></tr></table></figure>
+<p>表头就是计算平方的lambda函数，lambda函数里(x)是参数列表， (* x x)是函数体,lambda函数后跟着一个实参4，这样
+就计算出了16（像”+”,”-“,”*”,”/“这些运算符都是函数）
+为了方便我们可以把一个符号和一个lambda函数绑定起来:</p>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">define</span> square (<span class="name">lambda</span> (<span class="name">x</span>) (<span class="name">*</span> x x)))</span><br><span class="line">(<span class="name">square</span> <span class="number">4</span>) <span class="comment">;16</span></span><br></pre></td></tr></table></figure>
+<p>在Scheme中，也有define的另一种形式，一个语法糖效果，写起来更方便一些，像上面那个例子可以写成：</p>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">define</span> (<span class="name">square</span> x) (<span class="name">*</span> x x))</span><br></pre></td></tr></table></figure>
+<p>现在我们就可以写一个Lisp的hello world了，比如定义一个阶乘函数：</p>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">define</span> (<span class="name">fac</span> n)</span><br><span class="line">  (<span class="name">if</span> (<span class="name">=</span> <span class="number">0</span> n)</span><br><span class="line">    <span class="number">1</span>   </span><br><span class="line">    (<span class="name">*</span> n (<span class="name">fac</span> (<span class="name">-</span> n <span class="number">1</span>)))))</span><br></pre></td></tr></table></figure>
+<p>在函数式编程里面表达计算的主要手段之一就是递归，而不是我们熟悉的各种控制结构(for,while,do..)，函数式强调的是
+纯函数，即函数没有副作用，函数的概念就应该像数学里的函数一样，给一个相同的参数，总是计算出相同的值，它没有状
+态，不会因为内部的状态的改变或对外部状态的修改导致传入相同的参数却计算出不同的值。这种不一致的行为增加了调试的
+难度。如果你说“递归？效率不高啊！”那尾递归优化了解一下？比如阶乘也可以这么定义：</p>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">define</span> (<span class="name">fac</span> acc n)</span><br><span class="line">  (<span class="name">if</span> (<span class="name">=</span> <span class="number">0</span> n)</span><br><span class="line">    acc</span><br><span class="line">    (<span class="name">fac</span> (<span class="name">*</span> acc n) (<span class="name">-</span> n <span class="number">1</span>))))</span><br><span class="line"></span><br><span class="line">(<span class="name">fac</span> <span class="number">1</span> <span class="number">3</span>) <span class="comment">;计算3的阶乘，返回6</span></span><br></pre></td></tr></table></figure>
+<p>新的递归函数不在需要caller空间的数据，所以栈帧(stack frame)可以不用扩充，直接“原地递归”。再举一个简单的例子，比如python2中的range函数，range(low, high)返回[low, high)区间的整数列表，在Lisp可以这样写：</p>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">define</span> (<span class="name">range</span> low high)</span><br><span class="line">  (<span class="name">if</span> (<span class="name">&gt;=</span> low high)</span><br><span class="line">    '()</span><br><span class="line">    (<span class="name">cons</span> low (<span class="name">range</span> (<span class="name">+</span> low <span class="number">1</span>) high))))</span><br><span class="line"></span><br><span class="line">(<span class="name">range</span> <span class="number">0</span> <span class="number">10</span>) <span class="comment">; 输出(0 1 2 3 4 5 6 7 8 9)</span></span><br></pre></td></tr></table></figure>
+<p>因为函数式里面没有for,while之类的控制结构，为了表示对一堆数据进行操作，基本所以函数式语言中都内置了经典的
+map， filter等高阶函数。这两个参数形式都一样，第一个参数是一个函数，第二个函数是一个列表，map将函数作用在列表
+的每一个元素上并将返回值组成一个新列表，filter也是将函数作用在列表的每个元素上，只不过只有函数返回真时才将列表
+中的那个元素加入列表中，我写这个解释器中虽然没有内置这个两个高阶函数，但是我们可以轻易实现它：</p>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">define</span> (<span class="name">map</span> f lst)</span><br><span class="line">  (<span class="name">if</span> (<span class="name">null</span>? lst)</span><br><span class="line">    lst</span><br><span class="line">    (<span class="name">cons</span> (<span class="name">f</span> (<span class="name">car</span> lst)) (<span class="name">map</span> f (<span class="name">cdr</span> lst)))))</span><br><span class="line"></span><br><span class="line">(<span class="name">define</span> (<span class="name">filter</span> f lst)</span><br><span class="line">  (<span class="name">if</span> (<span class="name">null</span>? lst)</span><br><span class="line">    lst</span><br><span class="line">    (<span class="name">if</span> (<span class="name">f</span> (<span class="name">car</span> lst))</span><br><span class="line">      (<span class="name">cons</span> (<span class="name">car</span> lst) (<span class="name">filter</span> f (<span class="name">cdr</span> lst)))</span><br><span class="line">      (<span class="name">filter</span> f (<span class="name">cdr</span> lst)))))</span><br><span class="line">；测试</span><br><span class="line">(<span class="name">map</span> (<span class="name">lambda</span> (<span class="name">x</span>) (<span class="name">*</span> x x)) (<span class="name">range</span> <span class="number">0</span> <span class="number">10</span>)) <span class="comment">;求[0,10)所有数的平方</span></span><br><span class="line"><span class="comment">;返回 (0 1 4 9 16 25 36 49 64 81) </span></span><br><span class="line">(<span class="name">filter</span> (<span class="name">lambda</span> (<span class="name">x</span>) (<span class="name">=</span> (% x <span class="number">2</span>) <span class="number">0</span>)) (<span class="name">range</span> <span class="number">0</span> <span class="number">10</span>)) <span class="comment">;求[0,10)的所有偶数（“%”是取余函数）</span></span><br><span class="line"><span class="comment">;返回 （0 2 4 6 8）</span></span><br></pre></td></tr></table></figure>
+<p>对了，我写的那个解释器长这样，只包含一个简单的REPL(Read-Evalue-Read-Loop)交互环境，当然你也可以简单改改
+以读取整个源代码文件执行
+<img src="/2018/11/09/cpp-lisp-interpreter/toyLisp.png" title="toyLisp">
+到这里我觉得你已经差不多入门了，但是要想写好函数式的代码，思维从命令式语言转换过来还是需要多加练习的，比如就看
+SICP写后面的习题，如果你平时用Matlab，那可以去试试Mathematica。前面几个例子你可能觉得平平无奇，接下来一个用
+函数返回函数的特性（也就是闭包，如果你平时用python或javascript那应该不陌生）来“模拟”cons, car, cdr的例子
+我觉得你应该会被惊艳到的，至少我第一次看到的时候是有些震惊的，我个人感觉是最简短的诠释SICP数据抽象那一章的例子。
+<strong>到底什么是数据？</strong>
+我们前面看到cons的行为就好像是它能“存储”两个数据，把cons“存储”的结果给car，car返回构成这个cons cell的第一
+个表达式，cdr返回构成cons cell的第二个表达式，我们就是这样来获取cons cell中的数据的。如果没有这三个函数我们
+似乎就没有其他办法来构建可以存储，获取多个数据的设施了。但是……behold，如下我们定义了新的cons*, car*, cdr*
+函数（“*”没有特殊语义，它是标识符的一部分）</p>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">define</span> (<span class="name">cons*</span> x y)  </span><br><span class="line">  (<span class="name">lambda</span> (<span class="name">i</span>)</span><br><span class="line">    (<span class="name">if</span> (<span class="name">=</span> i <span class="number">0</span>) x y)))</span><br><span class="line"></span><br><span class="line">(<span class="name">define</span> (<span class="name">car*</span> x) (<span class="name">x</span> <span class="number">0</span>))</span><br><span class="line">(<span class="name">define</span> (<span class="name">cdr*</span> x) (<span class="name">x</span> <span class="number">1</span>))</span><br></pre></td></tr></table></figure>
+<p>cons*返回的是一个lambda函数，这个函数接受一个参数，如果等于1，就返回cons*的第一个参数，否则就返回第二个参
+数；然后car*,cdr*接受一个参数，把它当做函数，分别应用(apply)它到0和1。实验一下</p>
+<figure class="highlight lisp"><table><tr><td class="code"><pre><span class="line">(<span class="name">define</span> data (<span class="name">cons*</span> <span class="number">1</span> (<span class="name">cons*</span> <span class="number">2</span> <span class="number">3</span>)))</span><br><span class="line">(<span class="name">car*</span> data) <span class="comment">;返回 1</span></span><br><span class="line">(<span class="name">car*</span> (<span class="name">cdr*</span> data)) <span class="comment">;返回 2</span></span><br><span class="line">(<span class="name">cdr*</span> (<span class="name">cdr*</span> data)) <span class="comment">;返回 3</span></span><br></pre></td></tr></table></figure>
+<p>咋样，神奇吧？<strong>是函数还是数据？</strong> 虽然之前学Python了解闭包(Closure)，知道函数返回的函数还存储了定义它的环
+境的状态，但是没想到还有这种操作。接下来我就介绍一下这个解释器的实现，包括这个语言特性，闭包具体是怎么实现的。</p>
+<h2 id="解释器的实现"><a href="#解释器的实现" class="headerlink" title="解释器的实现"></a>解释器的实现</h2><p>上面一些例子你也看到了，从表示形式上看，Lisp代码它本身就是一个列表，而列表又是代码执行结果的一种表
+达式，一个  <strong>quote</strong> 操作符架起了代码与数据的桥梁，程序与数据水乳交融。鉴于Lisp语言的这个神奇性质，我觉得如
+果你对Lisp了解的还不是很多或者说觉得一开始用其他语言来写Lisp的解释器有点困难的话，写Lisp解释器最好还是用Lisp
+本身来写，就是说你用一个已经实现了的Lisp解释器（比如我刷SICP就用的MIT/Scheme）来解释Lisp程序，这就叫元循环
+求值器（Meta-Circular Evaluator)。关于如何写一个元循环求值器，除了看SICP，如果心急的话可以看看王垠的这个博
+客<a href="http://www.yinwang.org/blog-cn/2012/08/01/interpreter" target="_blank" rel="noopener">怎样写一个解释器</a>。在那个博客里用了Racket
+（Scheme的一种实现）写了一个非常简单的Lisp解释器，只支持算数运算和lambda函数，不到50行代码，但却足以让你体会
+到实现Lisp解释器的精要。</p>
+<p>整个解释器的主要动作就是对表达式求值，表达式分为数字(Number)，符号(Symbol)，列表（List)，对不同的表达式有不
+同的求值策略</p>
+<ul>
+<li><p>数字</p>
+<p>如果是一个数字，那就返回数字本身；</p>
+</li>
+<li><p>符号</p>
+<p>如果是一个符号，那就从环境中查找这个符号名字绑定的值</p>
+</li>
+<li><p>列表</p>
+<p>如果为空表，那么返回空表；否则递归地对列表中的每一个元素求值，然后将第一个元素的值应用（apply）到剩余表中元
+素的值上，其实就是处理函数调用。</p>
+</li>
+</ul>
+<p>什么是应用（apply)?Apply的过程将实际的参数值和定义函数的形式的符号绑定(Bound)，如果一个符号没有和一个表达式
+绑定，那就叫一个free/unbounded variable。比如对这个表达式((lambda (x) (* x x) 4)求值时就是将x与4绑定，
+对符号“*“求值引出了我们预先在环境中定义的乘法函数，把计算出的参数传给它，最后返回结果。再复杂的函数都可以一步步
+规约(reduce)，求值，最后计算出结果。再具体一点，在我的C++代码中，是这样表示一个表达式的：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Environment</span>;</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Expr</span> //表达式抽象基类</span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">    <span class="keyword">typedef</span> <span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Expr&gt; Ptr;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">enum</span> <span class="class"><span class="keyword">class</span> <span class="title">Type</span> &#123;</span>Number, Symbol, List, Lambda, Procedure&#125;;</span><br><span class="line"></span><br><span class="line">    Type type;</span><br><span class="line"></span><br><span class="line">    Expr()=<span class="keyword">default</span>;</span><br><span class="line">    Expr(Type t):type(t)&#123;&#125;</span><br><span class="line">    <span class="keyword">virtual</span> <span class="built_in">std</span>::<span class="function"><span class="built_in">string</span> <span class="title">to_string</span><span class="params">()</span></span>=<span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Ptr <span class="title">eval</span><span class="params">(<span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Environment&gt; env)</span></span>=<span class="number">0</span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">//数字， 为了实现简单，目前解释器只能处理整数，你可以扩展它使其支持浮点数，大数运算</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Number</span>:</span>Expr, <span class="built_in">std</span>::enable_shared_from_this&lt;Number&gt;</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">long</span> value;</span><br><span class="line"></span><br><span class="line">    Number():Expr(Expr::Type::Number)&#123;&#125;</span><br><span class="line">    Number(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">string</span> &amp;str):Expr(Expr::Type::Number),value(<span class="built_in">std</span>::stol(str))&#123;&#125;</span><br><span class="line">    Number(<span class="keyword">long</span> v):Expr(Expr::Type::Number),value(v)&#123;&#125;</span><br><span class="line">    </span><br><span class="line">    Expr::<span class="function">Ptr <span class="title">eval</span><span class="params">(<span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Environment&gt; env)</span></span>&#123;</span><br><span class="line">        <span class="keyword">return</span> shared_from_this(); <span class="comment">//对一个数字求值直接返回它自己</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">std</span>::<span class="function"><span class="built_in">string</span> <span class="title">to_string</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">std</span>::to_string(value);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>上面出现的那个Environment类就表示一个执行的环境，环境里记录着符号与表达式的对应关系：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Environment</span>:</span><span class="keyword">public</span> <span class="built_in">std</span>::enable_shared_from_this&lt;Environment&gt;</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">typedef</span> <span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Environment&gt; Ptr;</span><br><span class="line">    <span class="keyword">typedef</span> <span class="built_in">std</span>::<span class="built_in">map</span>&lt;<span class="built_in">std</span>::<span class="built_in">string</span>, Expr::Ptr&gt; Table; <span class="comment">//用map存储可以快速查找</span></span><br><span class="line"></span><br><span class="line">    Table symtable; <span class="comment">//符号表</span></span><br><span class="line">    Ptr   outer_env;  <span class="comment">//指针，指向外层的环境</span></span><br><span class="line">   </span><br><span class="line">    Environment()=<span class="keyword">default</span>;</span><br><span class="line">    Environment(List::Ptr vars, List::Ptr vals) &#123;add_bindings(vars, vals);&#125;</span><br><span class="line">    Environment(<span class="keyword">const</span> Table &amp;pairs):symtable(pairs)&#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">add_bindings</span><span class="params">(List::Ptr vars, List::Ptr vals)</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">add_bindings</span><span class="params">(<span class="keyword">const</span> Table &amp;pairs)</span></span>; </span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">add_bindings</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">string</span> &amp;name, Expr::Ptr expr)</span> </span>&#123;</span><br><span class="line">        symtable.insert(&#123;name, expr&#125;);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    Expr::<span class="function">Ptr <span class="title">find_value</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">string</span> &amp;name)</span></span>; </span><br><span class="line">    <span class="function">Ptr <span class="title">extended_env</span><span class="params">(List::Ptr vars, List::Ptr vals)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">auto</span> new_env = <span class="built_in">std</span>::make_shared&lt;Environment&gt;(vars, vals);</span><br><span class="line">        new_env-&gt;outer_env = shared_from_this(); </span><br><span class="line">        <span class="keyword">return</span> new_env;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>然后重点讲一下对lambda函数的表示和求值，我是这样表示的：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Lambda</span>:</span><span class="keyword">public</span> Expr, <span class="built_in">std</span>::enable_shared_from_this&lt;Lambda&gt;</span><br><span class="line">&#123;</span><br><span class="line">    List::Ptr params; <span class="comment">//参数列表</span></span><br><span class="line">    Expr::Ptr body;  <span class="comment">//函数体</span></span><br><span class="line">    <span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Environment&gt; env; <span class="comment">//定义lambda函数时的环境，闭包的关键</span></span><br><span class="line"></span><br><span class="line">    Lambda():Expr(Expr::Type::Lambda)&#123;&#125;</span><br><span class="line">    Lambda(List::Ptr p, Expr::Ptr b, <span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Environment&gt; e):</span><br><span class="line">           Expr(Expr::Type::Lambda), params(p), body(b), env(e)&#123;&#125;</span><br><span class="line"></span><br><span class="line">    Expr::<span class="function">Ptr <span class="title">eval</span><span class="params">(<span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Environment&gt; env)</span></span>&#123;</span><br><span class="line">        <span class="keyword">return</span> shared_from_this(); <span class="comment">//对lambda函数求值，直接返回它本身</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">std</span>::<span class="function"><span class="built_in">string</span> <span class="title">to_string</span><span class="params">()</span> </span>&#123;<span class="keyword">return</span> <span class="built_in">std</span>::<span class="built_in">string</span>(<span class="string">"&lt;Lambda&gt;"</span>);&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>当解释器看到一个列表，发现第一个符号是”lambda”，于是跳转到执行eval_lambda</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">Expr::<span class="function">Ptr <span class="title">eval_lambda</span><span class="params">(List::Ptr args, Environment::Ptr env)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> params = <span class="built_in">std</span>::static_pointer_cast&lt;List&gt;(args-&gt;expr);</span><br><span class="line">    <span class="keyword">auto</span> body = args-&gt;next_list();</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">std</span>::make_shared&lt;Lambda&gt;(params, body, env);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>函数很简单，举个例子，如果解释器处理(lambda (x) (* x x)), args是一个指向列表((x) (* x x))的指针，忘了
+说，列表的结构如下,  eval_lambda这三行就只是取出参数列表和lambda的函数体，以及我们eval这个lambda表达式时
+候的环境，构造返回一个Lambda对象，它也继承自Expr类，所以在lisp里我们可以像数值一样把函数传来传去。</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">List</span>:</span><span class="keyword">public</span> Expr, <span class="built_in">std</span>::enable_shared_from_this&lt;List&gt;</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">typedef</span> <span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;List&gt; Ptr;</span><br><span class="line"></span><br><span class="line">    Expr::Ptr expr; <span class="comment">//null if this is an empty list</span></span><br><span class="line">    Expr::Ptr next;</span><br><span class="line"></span><br><span class="line">    List():Expr(Expr::Type::List), expr(<span class="literal">nullptr</span>), next(<span class="literal">nullptr</span>)&#123;&#125;</span><br><span class="line">    List(Expr::Ptr _expr, Expr::Ptr _next):</span><br><span class="line">        Expr(Expr::Type::List), expr(_expr), next(_next)&#123;&#125;</span><br><span class="line"></span><br><span class="line">    Expr::<span class="function">Ptr <span class="title">eval</span><span class="params">(<span class="built_in">std</span>::<span class="built_in">shared_ptr</span>&lt;Environment&gt; env)</span></span>;</span><br><span class="line">    List::<span class="function">Ptr <span class="title">next_list</span><span class="params">()</span></span>&#123;<span class="keyword">return</span> <span class="built_in">std</span>::static_pointer_cast&lt;List&gt;(next);&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">bool</span> <span class="title">length_equals</span><span class="params">(<span class="keyword">long</span> len)</span></span>; </span><br><span class="line">    <span class="function"><span class="keyword">long</span> <span class="title">length</span><span class="params">()</span></span>;</span><br><span class="line">    <span class="built_in">std</span>::<span class="function"><span class="built_in">string</span> <span class="title">to_string</span><span class="params">()</span></span>; </span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">static</span> <span class="keyword">bool</span> <span class="title">can_iterate</span><span class="params">(List::Ptr lst)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> lst != <span class="literal">nullptr</span> &amp;&amp; lst-&gt;expr != <span class="literal">nullptr</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>当一个lambda函数应用到参数时又是如何计算的呢？以下是apply的部分代码：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">Expr::<span class="function">Ptr <span class="title">apply</span><span class="params">(Expr::Ptr func, List::Ptr args, Environment::Ptr env)</span> </span>&#123;</span><br><span class="line">    <span class="comment">/*</span></span><br><span class="line"><span class="comment">     *一些局部变量……省略</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">    <span class="keyword">switch</span>(func-&gt;type) &#123;</span><br><span class="line">            <span class="keyword">case</span> Expr::Type::Lambda:</span><br><span class="line">                &#123;</span><br><span class="line">                    <span class="keyword">auto</span> lam = <span class="built_in">std</span>::static_pointer_cast&lt;Lambda&gt;(func);</span><br><span class="line">                    <span class="keyword">auto</span> sub_body = lam-&gt;body;</span><br><span class="line">                    <span class="keyword">auto</span> new_env = lam-&gt;env-&gt;extended_env(lam-&gt;params,</span><br><span class="line">                                                          eval_arguments(args, env));</span><br><span class="line">                    Expr::Ptr value;</span><br><span class="line">                    <span class="keyword">while</span>(List::can_iterate(sub_body)) &#123;</span><br><span class="line">                       value = sub_body-&gt;expr-&gt;eval(new_env);</span><br><span class="line">                       sub_body = sub_body-&gt;next_list();</span><br><span class="line">                    &#125;</span><br><span class="line">                    <span class="keyword">return</span> value;</span><br><span class="line">                &#125;</span><br><span class="line">          <span class="comment">/*其他部分……省略*/</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>对于表达式((lambda (x) (* x x)) 4)，解释器先eval表头， 返回一个Lambda对象，进入apply的lambda分支，
+eval_arguments计算参数，即4，数字是原子，返回本身，然后取出lambda的参数列表(x)与实参4绑定建立了新环境
+new_env，new_env里还有一个outter_env环境指针指向着之前定义lambda函数的环境即lam-&gt;env，这样就可以沿着这个
+环境链找到定义lambda的那个空间的变量的值。其实就是因为我们保存环境是用的指针，所以像之前那样写Lisp递归的时候
+很自然，解释器能正常工作，若把环境值拷贝保存进Lambda，那像我们之前那样的阶乘函数fac在计算的时候，解释器就会报
+错说找不到变量”fac”，因为“fac”是在构建了Lambda之后才有的。其实在纯的lambda演算里没有环境这个说法，lambda演
+算就是纯粹的符号替换，要想实现递归还要借助很绕脑的Y combinator（关于Y combinator可以参考
+<a href="http://mindhacks.cn/2006/10/15/cantor-godel-turing-an-eternal-golden-diagonal/" target="_blank" rel="noopener">康托尔、哥德尔、图灵——永恒的金色对角线</a> ）。
+另外也可以想象在一个稍微复杂点的程序里如果手动管理指针内存的释放是多么的费精力，一块内存被多个对象引用，到底哪
+个来最后释放？不过还好现代C++有了智能指针。</p>
+<p>关于这个解释器的详细代码我就不贴出来了，大概有6，700行，我把它放到
+<a href="https://github.com/xc42/toyLisp" target="_blank" rel="noopener">我的github</a>上。你还可以给解释器添加新的语法、函数，目前解释器还不支持
+对浮点数，大数，字符串的运算，错误处理，遇到不正确的代码只是throw一个exception大致报一下错误。像Scheme中的
+let也没有实现，let的语法是(let ((var1 val1) (var2 val2)) body)，可以有多个“变量绑定”。比如可以这么写
+(let ((x 2) (y 3)) (* x y))计算出6。其实let就是((lambda (x y) (* x y)) 2 3)的语法糖。还有就是函数
+的可变长参数，语法是这样(define (sum .nums) (apply + sums))，写(sum 1 2 3 4 5)就可以计算出15。这些在你了解了原理之后都可以轻松实现:）</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://xc42.github.io/2018/11/09/cpp-lisp-interpreter/" data-id="cjo9nf2l00000jhpqz27lr28u" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/解释器-函数式编程-Lisp-Scheme-C-SICP/">解释器 函数式编程 Lisp Scheme C++ SICP</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+  
+</article>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/解释器-函数式编程-Lisp-Scheme-C-SICP/">解释器 函数式编程 Lisp Scheme C++ SICP</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/解释器-函数式编程-Lisp-Scheme-C-SICP/" style="font-size: 10px;">解释器 函数式编程 Lisp Scheme C++ SICP</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">November 2018</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2018/11/09/cpp-lisp-interpreter/">机器的机器（零）--如何用C++实现一个Lisp解释器</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2018 Hexagon<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+
+
+
+  </div>
+</body>
+</html>
